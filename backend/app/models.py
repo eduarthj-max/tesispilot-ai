@@ -51,3 +51,14 @@ class Chapter(Base):
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
     thesis = relationship("Thesis", back_populates="chapters")
+
+
+class Version(Base):
+    __tablename__ = "versions"
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    chapter_id = Column(UUID(as_uuid=False), ForeignKey("chapters.id"))
+    content = Column(Text)
+    created_by = Column(UUID(as_uuid=False), nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    chapter = relationship("Chapter")

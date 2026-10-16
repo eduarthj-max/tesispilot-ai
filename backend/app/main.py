@@ -1,29 +1,25 @@
-# Update backend main to include versions router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import theses, chapters, ai, versions
+from app.api.routes import theses, chapters, ai, versions, export
 from app.db.session import engine, Base
 
-# Create DB tables (for dev). For production use Alembic migrations.
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="TesisPilot API - MVP")
+app = FastAPI(title='TesisPilot API - MVP')
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=['*'],
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
-app.include_router(theses.router, prefix="/api/theses", tags=["theses"])
-app.include_router(chapters.router, prefix="/api/chapters", tags=["chapters"])
-# AI endpoints (generate problem, review chapter)
-app.include_router(ai.router, prefix="/api", tags=["ai"])
-# Versions and summarize endpoints
-app.include_router(versions.router, prefix="/api", tags=["versions"])
+app.include_router(theses.router, prefix='/api/theses', tags=['theses'])
+app.include_router(chapters.router, prefix='/api/chapters', tags=['chapters'])
+app.include_router(ai.router, prefix='/api', tags=['ai'])
+app.include_router(versions.router, prefix='/api', tags=['versions'])
+app.include_router(export.router, prefix='/api', tags=['export'])
 
-
-@app.get("/")
+@app.get('/')
 def root():
-    return {"message": "TesisPilot API running"}
+    return {'message': 'TesisPilot API running'}

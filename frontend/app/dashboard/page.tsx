@@ -1,58 +1,27 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { apiFetch } from '@/lib/api'
+import { ProtectedPage } from '@/components/ProtectedPage'
 import { Sidebar } from '@/components/Sidebar'
 import { Topbar } from '@/components/Topbar'
-import { ThesisCard } from '@/components/ThesisCard'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function DashboardPage() {
-  const [theses, setTheses] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await apiFetch('/api/theses')
-        setTheses(data)
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
+  const { user } = useAuth()
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Topbar title="Dashboard" />
-        <main className="page">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h2 style={{ margin: 0 }}>Mis tesis</h2>
-            <Link href="/thesis/new">
-              <button className="primary">Nueva tesis</button>
-            </Link>
-          </div>
-
-          {loading ? (
-            <div className="card">Cargando...</div>
-          ) : (
-            <div className="grid three">
-              {theses.length === 0 ? (
-                <div className="card">Aún no hay tesis creadas.</div>
-              ) : (
-                theses.map((thesis) => (
-                  <ThesisCard key={thesis.id} thesis={thesis} />
-                ))
-              )}
+    <ProtectedPage>
+      <div style={{ display: 'flex', minHeight: '100vh' }}>
+        <Sidebar />
+        <div style={{ flex: 1 }}>
+          <Topbar title={`Dashboard · ${user?.full_name || 'Usuario'}`} />
+          <main className="page">
+            <div className="card" style={{ marginBottom: 20 }}>
+              <h2 style={{ marginTop: 0 }}>Bienvenido</h2>
+              <div className="text-muted">Correo: {user?.email}</div>
             </div>
-          )}
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
+    </ProtectedPage>
   )
 }

@@ -86,8 +86,10 @@ def export_thesis(thesis_id: str, payload: ExportRequest, db: Session = Depends(
     content += f"## Problema de investigación\n{thesis.problem_statement or 'Sin problema de investigación definido.'}\n\n"
     content += f"## Objetivos\n{thesis.objectives or 'Sin objetivos definidos.'}\n\n"
 
-    for ch in chapters:
-        content += f"## {ch.title}\n{ch.content or ''}\n\n"
+    for idx, ch in enumerate(chapters, start=1):
+        # prefix chapter titles with numbering
+        prefix = f"{idx}. "
+        content += f"## {prefix}{ch.title}\n{ch.content or ''}\n\n"
 
     # fetch references if table exists
     refs = []
@@ -131,22 +133,40 @@ def export_thesis(thesis_id: str, payload: ExportRequest, db: Session = Depends(
     elif payload.format == 'docx':
         try:
             from docx import Document
+            from docx.oxml import OxmlElement
+            from docx.oxml.ns import qn
+
             doc = Document()
             doc.add_heading(thesis.title, level=1)
             doc.add_paragraph(thesis.abstract or 'Sin resumen.')
             doc.add_paragraph('\n')
+
+            # Insert a TOC field for Word
+            p = doc.add_paragraph()
+            fld = OxmlElement('w:fldSimple')
+            fld.set(qn('w:instr'), 'TOC \\o "1-3" \\h \\z \\u')
+            p._p.addnext(fld)
+            # Add a page break after TOC
+            doc.add_page_break()
+
+            # Add problem and objectives
             doc.add_heading('Problema de investigación', level=2)
             doc.add_paragraph(thesis.problem_statement or '')
             doc.add_heading('Objetivos', level=2)
             doc.add_paragraph(thesis.objectives or '')
-            for ch in chapters:
-                doc.add_heading(ch.title, level=2)
+
+            # Add chapters with numbered headings
+            for idx, ch in enumerate(chapters, start=1):
+                title = f"{idx}. {ch.title}"
+                doc.add_heading(title, level=2)
                 doc.add_paragraph(ch.content or '')
+
             if refs:
                 doc.add_heading('Referencias', level=2)
                 formatted = format_references(refs, payload.citation_style or 'APA')
                 for line in formatted.split('\n'):
                     doc.add_paragraph(line)
+
             if annexes:
                 doc.add_heading('Anexos', level=2)
                 for a in annexes:
@@ -156,47 +176,84 @@ def export_thesis(thesis_id: str, payload: ExportRequest, db: Session = Depends(
                     except Exception:
                         fname, furl = (a[0], a[1] if len(a) > 1 else '')
                     doc.add_paragraph(f"{fname} ({furl})")
+
             doc.save(str(out_path))
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f'Could not generate DOCX: {exc}')
     elif payload.format == 'pdf':
         try:
             from reportlab.lib.pagesizes import letter
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+            from reportlab.platypus.tableofcontents import TableOfContents
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
             from reportlab.lib.units import inch
+
             styles = getSampleStyleSheet()
+            # customize heading styles for TOC recognition
+            h1 = styles['Heading1']
+            h2 = styles['Heading2']
+            body = styles['BodyText']
+
+            toc = TableOfContents()
+            toc.levelStyles = [
+                ParagraphStyle(fontSize=14, name='TOCHeading1', leftIndent=20, firstLineIndent=-20, spaceBefore=5),
+                ParagraphStyle(fontSize=12, name='TOCHeading2', leftIndent=40, firstLineIndent=-20, spaceBefore=2),
+            ]
+
             doc = SimpleDocTemplate(str(out_path), pagesize=letter)
             story = []
+
+            # Title
             story.append(Paragraph(thesis.title, styles['Title']))
             story.append(Spacer(1, 0.25 * inch))
-            story.append(Paragraph(f"Resumen: {thesis.abstract or 'Sin resumen.'}", styles['BodyText']))
-            story.append(Spacer(1, 0.20 * inch))
-            story.append(Paragraph('Problema de investigación', styles['Heading2']))
-            story.append(Paragraph(thesis.problem_statement or '', styles['BodyText']))
+
+            # Add TOC
+            story.append(Paragraph('Tabla de contenidos', h1))
+            story.append(toc)
+            story.append(PageBreak())
+
+            # Summary and problem/objectives
+            story.append(Paragraph('Resumen', h2))
+            story.append(Paragraph(thesis.abstract or 'Sin resumen.', body))
             story.append(Spacer(1, 0.15 * inch))
-            story.append(Paragraph('Objetivos', styles['Heading2']))
-            story.append(Paragraph(thesis.objectives or '', styles['BodyText']))
+
+            story.append(Paragraph('Problema de investigación', h2))
+            story.append(Paragraph(thesis.problem_statement or '', body))
             story.append(Spacer(1, 0.15 * inch))
-            for ch in chapters:
-                story.append(Paragraph(ch.title, styles['Heading2']))
-                story.append(Paragraph(ch.content or '', styles['BodyText']))
+
+            story.append(Paragraph('Objetivos', h2))
+            story.append(Paragraph(thesis.objectives or '', body))
+            story.append(Spacer(1, 0.15 * inch))
+
+            # Add chapters; use heading style so TOC picks them
+            for idx, ch in enumerate(chapters, start=1):
+                # Create numbered title
+                title = f"{idx}. {ch.title}"
+                story.append(Paragraph(title, h2))
+                story.append(Paragraph(ch.content or '', body))
                 story.append(Spacer(1, 0.15 * inch))
+
+            # References
             if refs:
-                story.append(Paragraph('Referencias', styles['Heading2']))
+                story.append(Paragraph('Referencias', h2))
                 formatted = format_references(refs, payload.citation_style or 'APA')
                 for line in formatted.split('\n'):
-                    story.append(Paragraph(line, styles['BodyText']))
+                    story.append(Paragraph(line, body))
+                story.append(Spacer(1, 0.15 * inch))
+
+            # Annexes
             if annexes:
-                story.append(Paragraph('Anexos', styles['Heading2']))
+                story.append(Paragraph('Anexos', h2))
                 for a in annexes:
                     try:
                         fname = a['file_name']
                         furl = a['file_url']
                     except Exception:
                         fname, furl = (a[0], a[1] if len(a) > 1 else '')
-                    story.append(Paragraph(f"{fname} ({furl})", styles['BodyText']))
-            doc.build(story)
+                    story.append(Paragraph(f"{fname} ({furl})", body))
+
+            # Build PDF with multi-pass so TOC is filled
+            doc.multiBuild(story)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f'Could not generate PDF: {exc}')
     else:

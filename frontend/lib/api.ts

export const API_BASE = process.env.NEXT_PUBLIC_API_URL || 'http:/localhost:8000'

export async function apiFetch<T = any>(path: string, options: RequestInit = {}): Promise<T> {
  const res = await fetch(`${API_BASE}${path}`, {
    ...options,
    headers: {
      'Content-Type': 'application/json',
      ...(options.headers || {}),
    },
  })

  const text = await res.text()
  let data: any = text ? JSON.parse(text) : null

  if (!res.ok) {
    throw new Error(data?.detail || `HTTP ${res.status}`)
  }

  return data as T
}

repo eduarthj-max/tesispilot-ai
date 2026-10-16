@@ -1,0 +1,69 @@
+'use client'
+
+import { useState } from 'react'
+import { apiFetch } from '@/lib/api'
+
+export function IAReviewPanel({ thesis, chapter, refresh }: { thesis: any; chapter: any; refresh: () => Promise<void> }) {
+  const [problemText, setProblemText] = useState('')
+  const [reviewText, setReviewText] = useState('')
+  const [loadingProblem, setLoadingProblem] = useState(false)
+  const [loadingReview, setLoadingReview] = useState(false)
+
+  const generateProblem = async () => {
+    if (!thesis) return
+    setLoadingProblem(true)
+    try {
+      const data = await apiFetch(`/api/theses/${thesis.id}/generate-problem`, {
+        method: 'POST',
+        body: JSON.stringify({
+          topic: thesis.topic || thesis.title,
+          context: thesis.abstract || 'Generar una propuesta de investigación',
+        }),
+      })
+      setProblemText(JSON.stringify(data, null, 2))
+      await refresh()
+    } finally {
+      setLoadingProblem(false)
+    }
+  }
+
+  const reviewChapter = async () => {
+    if (!chapter) return
+    setLoadingReview(true)
+    try {
+      const data = await apiFetch(`/api/chapters/${chapter.id}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ text: chapter.content || '' }),
+      })
+      setReviewText(JSON.stringify(data, null, 2))
+    } finally {
+      setLoadingReview(false)
+    }
+  }
+
+  return (
+    <div>
+      <h3 style={{ marginTop: 0 }}>Asistente de IA</h3>
+      <button className="primary" onClick={generateProblem} disabled={loadingProblem} style={{ width: '100%', marginBottom: 10 }}>
+        {loadingProblem ? 'Generando...' : 'Generar problema'}
+      </button>
+      <button className="secondary" onClick={reviewChapter} disabled={loadingReview} style={{ width: '100%', marginBottom: 12 }}>
+        {loadingReview ? 'Revisando...' : 'Revisar capítulo'}
+      </button>
+
+      {problemText && (
+        <div>
+          <strong>Problema generado</strong>
+          <pre>{problemText}</pre>
+        </div>
+      )}
+
+      {reviewText && (
+        <div style={{ marginTop: 16 }}>
+          <strong>Revisión del capítulo</strong>
+          <pre>{reviewText}</pre>
+        </div>
+      )}
+    </div>
+  )
+}

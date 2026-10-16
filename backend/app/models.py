@@ -16,6 +16,7 @@ class User(Base):
     full_name = Column(String(255))
     university = Column(String(255))
     academic_level = Column(String(100))
+    password_hash = Column(String(255), nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 

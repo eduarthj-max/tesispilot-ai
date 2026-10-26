@@ -1,46 +1,25 @@
-from fastapi import APIRouter, HTTPException, Query
-
-from app.services import zotero_service
-
-router = APIRouter()
+from pydantic import BaseSettings
 
 
-@router.get("/health")
-def zotero_health():
-    result = zotero_service.get_status()
-    if not result.get("ok"):
-        raise HTTPException(status_code=503, detail=result)
-    return result
+class Settings(BaseSettings):
+    DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/tesispilot"
+    OPENAI_API_KEY: str | None = None
+    PROJECT_NAME: str = "TesisPilot"
+
+    # Zotero integration
+    ZOTERO_API_URL: str = "https://api.zotero.org"
+    ZOTERO_API_KEY: str | None = None
+    ZOTERO_USER_ID: str | None = None
+    ZOTERO_LIBRARY_TYPE: str = "user"
+    ZOTERO_DEFAULT_COLLECTION_ID: str | None = None
+
+    # Auth
+    SECRET_KEY: str = "supersecret_replace_in_prod"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
+    class Config:
+        env_file = ".env"
 
 
-@router.get("/search")
-def search_references(
-    query: str = Query(..., min_length=1),
-    limit: int = Query(10, ge=1, le=50),
-):
-    try:
-        items = zotero_service.search_references(query=query, limit=limit)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:  # pragma: no cover - depends on external service
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    return {"query": query, "count": len(items), "items": items}
-
-
-@router.get("/items")
-def list_items(collection_id: str | None = None, limit: int = Query(10, ge=1, le=50)):
-    try:
-        items = zotero_service.list_collection_items(collection_id=collection_id, limit=limit)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:  # pragma: no cover - depends on external service
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    return {"collection_id": collection_id, "count": len(items), "items": items}
-
-
-__all__ = ["router"]
-
-
-path":"backend/app/api/routes/zotero.py
+settings = Settings()

@@ -1,28 +1,27 @@
-from pydantic import BaseSettings
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.api.routes import theses, chapters, ai, versions, export, zotero
+from app.db.session import engine, Base
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title='TesisPilot API - MVP')
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
+
+app.include_router(theses.router, prefix='/api/theses', tags=['theses'])
+app.include_router(chapters.router, prefix='/api/chapters', tags=['chapters'])
+app.include_router(ai.router, prefix='/api', tags=['ai'])
+app.include_router(versions.router, prefix='/api', tags=['versions'])
+app.include_router(export.router, prefix='/api', tags=['export'])
+app.include_router(zotero.router, prefix='/api/zotero', tags=['zotero'])
 
 
-class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/tesispilot"
-    OPENAI_API_KEY: str | None = None
-    PROJECT_NAME: str = "TesisPilot"
-
-    # Zotero integration
-    ZOTERO_API_URL: str = "https://api.zotero.org"
-    ZOTERO_API_KEY: str | None = None
-    ZOTERO_USER_ID: str | None = None
-    ZOTERO_LIBRARY_TYPE: str = "user"
-    ZOTERO_DEFAULT_COLLECTION_ID: str | None = None
-
-    # Auth
-    SECRET_KEY: str = "supersecret_replace_in_prod"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
-
-    class Config:
-        env_file = ".env"
-
-
-settings = Settings()
-
-
-path":"backend/app/core/config.py
+@app.get('/')
+def root():
+    return {'message': 'TesisPilot API running'}

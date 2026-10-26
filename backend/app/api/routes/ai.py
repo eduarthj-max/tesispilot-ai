@@ -1,15 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.db.session import get_db
-from app import models
-from app.services import ai_service
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app import models
+from app.db.session import get_db
+from app.services import ai_service
 
 router = APIRouter()
+
 
 class GenerateProblemRequest(BaseModel):
     topic: str | None = None
     context: str | None = ""
+
+
+class ReviewRequest(BaseModel):
+    text: str | None = None
 
 
 @router.post("/theses/{thesis_id}/generate-problem")
@@ -20,10 +26,8 @@ def generate_problem_for_thesis(thesis_id: str, payload: GenerateProblemRequest,
 
     topic = payload.topic or thesis.topic or ""
     context = payload.context or ""
-
     result = ai_service.generate_problem(topic=topic, context=context)
 
-    # If the service returned text, save it to the thesis.problem_statement (best-effort)
     text = result.get("text") if isinstance(result, dict) else None
     if text:
         thesis.problem_statement = text
@@ -32,10 +36,6 @@ def generate_problem_for_thesis(thesis_id: str, payload: GenerateProblemRequest,
         db.refresh(thesis)
 
     return {"ok": True, "ai": result, "thesis": {"id": thesis.id, "problem_statement": thesis.problem_statement}}
-
-
-class ReviewRequest(BaseModel):
-    text: str | None = None
 
 
 @router.post("/chapters/{chapter_id}/review")
@@ -50,3 +50,14 @@ def review_chapter(chapter_id: str, payload: ReviewRequest, db: Session = Depend
 
     result = ai_service.review_chapter_text(text_to_review)
     return {"ok": True, "ai": result}
+
+
+@router.get("/thesis/recommend-literature")
+def recommend_literature(topic: str, limit: int = 5):
+    if not topic or not topic.strip():
+        raise HTTPException(status_code=400, detail="topic is required")
+
+    result = ai_service.recommend_literature(topic=topic.strip(), limit=limit)
+    if "error" in result and not result.get("references"):
+        raise HTTPException(status_code=400, detail=result)
+    return result

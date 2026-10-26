@@ -4,6 +4,8 @@ from pydantic import BaseSettings
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/tesispilot"
     OPENAI_API_KEY: str | None = None
+    ANTHROPIC_API_KEY: str | None = None
+    ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
     PROJECT_NAME: str = "TesisPilot"
 
     # Zotero integration
